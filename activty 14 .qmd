@@ -1,0 +1,605 @@
+---
+title: "Exploring Data with Visualizations"
+author: "Ting Huang"
+date: "November 12, 2025"
+format: 
+  pdf: 
+    number-sections: true
+    fig-align: center
+    cap-location: top
+    geometry: 
+      - top=1in
+      - left=1in
+      - right=1in
+      - bottom=1in
+    colorlinks: true
+execute: 
+  echo: false
+  warning: false
+---
+
+```{r}
+#| label: docSetup
+#| include: false
+
+# install.packages("tinytex")
+# below is the command for Pyhton if anyone wants to use instead of R. Run the command in terminal.
+# python -m pip install jupyter pandas numpy matplotlib
+
+# Load Packages ----
+library(googlesheets4) # For loading Armed Forces Data
+library(rvest) # For scraping Armed Forces Ranks
+#library(dcData) # For loading Baby Names Data
+library(babynames)  # For loading Baby Names Data
+library(tidyverse) # For data wrangling and visualizing
+library(janitor) # For making two-way table
+library(knitr) # For creating professional tables
+library(kableExtra) # For styling professional tables
+
+```
+
+# Exploring the Armed Forces
+
+For this section, we want you to create a two-way frequency table to explore the impact of sex and rank in the US Armed Forces.
+In this section I focus on the Air Force airman series, that is, service members in the ranks of Airman Basic, Airman, and Airman First Class. Tables 1 and 2 show the distribution of these ranks separately for men and women. Among male airmen there are 8,537 Airman Basic (16.0%), 7,343 Airman (13.8%), and 37,324 Airman First Class (70.2%). Among female airmen there are 1,933 Airman Basic (13.5%), 2,019 Airman (14.1%), and 10,369 Airman First Class (72.4%). The conditional distributions are therefore very similar: for both sexes, about 70% of individuals are Airman First Class and only a small minority are in the two lower grades. Because the percentage breakdown across ranks is almost the same for males and females, sex and rank appear to be approximately independent in this Air Force airman subgroup—knowing a person’s sex does not substantially change the probability that they hold any one of these three ranks.
+
+\newpage
+```{r, results="asis"}
+#| label: armed-forces-wrangle
+# Tidy Armed Forces Data ---- ## Make two tied data frames for the June 2025 armed forces data ## 1 where case is a group of soliders and 1 where the case is ## an individual solider. Both need to have rank added. 
+# Step 1: Load Packages ---- 
+library(tidyverse) 
+library(rvest) 
+library(googlesheets4) 
+# Step 2: Scrape Rank Data ---- 
+webRanks <- read_html("https://neilhatfield.github.io/Stat184_PayGradeRanks.html") %>% html_elements(css = "table") %>% 
+html_table() 
+rawRanks <- webRanks[[1]] # Extract the data frame of ranks 
+# Step 3: Wrangle Rank Data ----
+## Enter a value in the first cell (1, 1)
+rawRanks[1, 1] <- "Type"
+## Extract actual column headers
+rankHeaders <- rawRanks[1, ]
+## Apply headers as column names
+names(rawRanks) <- rankHeaders[1,]
+## Remove redundant first row and last row
+rawRanks <- rawRanks[-c(1, 26), ]
+
+cleanRanks <- rawRanks %>%
+  dplyr::select(!Type) %>% # Remove extra column
+  pivot_longer(
+    cols = !`Pay Grade`, # The improper name requires backticks
+    names_to = "Branch",
+    values_to = "Rank"
+  ) %>%
+  mutate(
+    Rank = na_if(x = Rank, y = "--")
+  )
+# Step 4: Load Armed Forces Data ----
+gs4_deauth() # Prevents needing to sign into a Google account
+forcesHeaders <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
+  col_names = FALSE, # Turn off Column Names
+  n_max = 3 # read only the first three rows
+)
+
+rawForces <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
+  col_names = FALSE, # Turn off Column Names
+  skip = 3, # Skip the first three rows
+  n_max = 28, # Read only the next 28 rows; drops footer
+  na = c("N/A*") # Tells R to treat the N/A* as missing values
+)
+
+
+# Step 5: Wrangle Armed Forces Data ----
+## Step 5a: Create good column names ----
+### Pattern is Pay Grade followed by 3 columns for each branch in the order
+### Army, Navy, Marine Corp, Air Force, Space Force, and Total
+branchNames <- rep( # Create three copies of each branch
+  x = c("Army", "Navy", "Marine Corps", "Air Force", "Space Force", "Total"),
+  each = 3
+)
+tempHeaders <- paste( # Combine branch with other headers
+  c("", branchNames),
+  forcesHeaders[3,],
+  sep = "."
+)
+
+names(rawForces) <- tempHeaders
+
+## Step 5b: Wrangle Armed Forces Data ----
+cleanForces <- rawForces %>%
+  rename(Pay.Grade = `.Pay Grade`) %>%
+  dplyr::select(!contains("Total")) %>% # Remove total columns
+  filter( # Remove total rows; see note below
+    Pay.Grade != "Total Enlisted" & 
+   Pay.Grade != "Total Warrant Officers" & 
+   Pay.Grade != "Total Officers" & 
+   Pay.Grade != "Total"
+    ) %>% 
+  pivot_longer( # Reshape data
+    cols = !Pay.Grade,
+    names_to = "Branch.Sex",
+    values_to = "Frequency"
+  ) %>%
+  separate_wider_delim( # Separate branches and sex
+    cols = Branch.Sex,
+    delim = ".",
+    names = c("Branch", "Sex")
+  ) 
+
+# Step 6: Merge Data Frames ----
+key_forcesRanks <- left_join(
+  x = cleanForces,
+  y = cleanRanks,
+  by = join_by(Pay.Grade == `Pay Grade`, Branch == Branch)
+)
+
+# Step 7: Transform Group into Individual ----
+key_individualRanks <- key_forcesRanks %>%
+  filter(!is.na(Frequency)) %>% # Remove all cases with missing counts
+  uncount(
+    weights = Frequency
+  )
+
+# Armed Forces Frequency Tables ----
+#Goal: Make two frequency tables showing rank and branch, by sex.
+
+# I am going to use the key_IndividualRanks data frame 
+
+# Load Packages ----
+library(tidyverse)
+library(janitor)
+library(knitr)
+library(kableExtra)
+
+# Filter Data on Sex ----
+maleSoldiers <- key_individualRanks %>%
+  filter(Sex == "Male")
+femaleSoldiers <- key_individualRanks %>%
+  filter(Sex == "Female")
+
+# Create Male Table ----
+## Base Table ----
+maleTable <- maleSoldiers %>%
+  tabyl(Rank, Branch) %>% # Original Branch, Rank; flipped for improvement
+  adorn_totals(where = c("row", "col")) %>%
+  adorn_percentages(denominator = "all") %>%
+  adorn_pct_formatting(digits = 2) 
+
+## Add Absolute Frequencies ----
+formatNs <- attr(maleTable, "core") %>%
+  adorn_totals(where = c("row", "col")) %>%
+  mutate(
+    across(where(is.numeric), .fns = ~format(.x, big.mark = ","))
+  )
+
+## Finalize Male Table ----
+maleTable <- maleTable %>%
+  adorn_ns(position = "front", ns = formatNs)
+
+# Create Female Table ----
+## Base Table ----
+femaleTable <- femaleSoldiers %>%
+  tabyl(Rank, Branch) %>%
+  adorn_totals(where = c("row", "col")) %>%
+  adorn_percentages(denominator = "all") %>%
+  adorn_pct_formatting(digits = 2) 
+
+## Add Absolute Frequencies ----
+formatNs <- attr(femaleTable, "core") %>%
+  adorn_totals(where = c("row", "col")) %>%
+  mutate(
+    across(where(is.numeric), .fns = ~format(.x, big.mark = ","))
+  )
+
+## Finalize Female Table ----
+femaleTable <- femaleTable %>%
+  adorn_ns(position = "front", ns = formatNs)
+
+# Polish Tables ----
+## Male Table ----
+maleTable %>%
+  kable(
+    caption = "Male Activity Duty Soldiers by Rank and Branch",
+    format   = "latex"
+  ) %>%
+  kable_styling(
+    latex_options = c("hold_position", "scale_down") 
+  )
+
+## Female Table ----
+femaleTable %>%
+  kable(
+    caption = "Female Activity Duty Soldiers by Rank and Branch",
+    format   = "latex"
+  ) %>%
+  kable_styling(
+    latex_options = c("hold_position", "scale_down") 
+  )
+```
+\newpage
+# Popularity of Baby Names
+
+The visualization below revisits Activity #13. Figure X shows how the popularity of four relatively uncommon baby names—Aahil, Aarin, Charlise, and Eryana—has changed over time in the U.S. Social Security Administration data. The x-axis is the year and the y-axis is the total number of babies given each name. Charlise appears the earliest and has several small waves, peaking in the early 2000s at over 50 babies in a year before declining. Aarin first appears in the mid-1970s and is never very common, but it fluctuates between about 10 and 30 births per year. Aahil is a much more recent name: it starts to appear around 2000 and rises quickly, reaching more than 40 babies per year by the late 2010s. Eryana is the rarest of the four, only showing up for a short period in the 2000s with fewer than 10 births per year.
+
+I chose these names because they are unusual but not completely absent, which makes their trends easier to see without the lines overlapping too much. They also represent different patterns of popularity: an older name with several waves (Charlise), a steady but low-level name (Aarin), a newer name that is currently growing (Aahil), and a very rare name that appears only briefly (Eryana). Together, they illustrate how baby name popularity can rise, fall, or stay small over time.
+
+```{r}
+#| label: baby-names-plot
+# Load baby names data reproducibly
+bn <- NULL
+if (requireNamespace("dcData", quietly = TRUE)) {
+  data("BabyNames", package = "dcData", envir = environment())
+  bn <- get("BabyNames")
+} else {
+  stop("dcData package is required for BabyNames.")
+}
+
+# Standardize names and check required columns
+names(bn) <- gsub("\\.+", "_", tolower(names(bn)))
+required <- c("name","year","count")
+if (!all(required %in% names(bn))) stop("dcData::BabyNames must contain columns: name, year, count")
+
+# Select names and compute yearly totals
+instructors <- c("Aahil", "Aarin", "Charlise", "Eryana")
+subsetNames <- bn %>%
+  dplyr::filter(name %in% instructors) %>%
+  dplyr::group_by(name, year) %>%
+  dplyr::summarise(total = sum(count), .groups = "drop")
+
+# Linetype mapping (only affects names that appear in data; others default to solid)
+lt_all <- setNames(rep("solid", length(unique(subsetNames$name))), sort(unique(subsetNames$name)))
+lt_special <- c(
+  "Aahil"    = "solid",
+  "Aarin"    = "dashed",
+  "Charlise" = "longdash",
+  "Eryana"   = "dotdash"
+)
+overlap <- intersect(names(lt_special), names(lt_all))
+lt_all[overlap] <- lt_special[overlap]
+
+# Plot with ggplot2 (merged color + linetype legend)
+p_names <- ggplot(subsetNames, aes(x = year, y = total, color = name, linetype = name)) +
+  geom_line(linewidth = 0.9) +
+  scale_linetype_manual(values = lt_all) +
+  labs(
+    title = "Popularity of Selected Baby Names Over Time",
+    x = "Year",
+    y = "Total babies given name (US SSA)",
+    color = "Name",
+    linetype = "Name"
+  ) +
+  theme_minimal()
+
+p_names
+```
+
+# The Box Problem
+This graph shows how the volume of an open-top box changes as we vary the side length x of the squares cut from each corner of a 36 inch by 48 inch sheet of cardboard. The horizontal axis is the cut-out length x (in inches), and the vertical axis is the resulting box volume V(x) in cubic inches. The curve starts at 0, increases as x gets larger, reaches a single peak, and then decreases back toward 0 when x becomes too large and the cardboard can no longer form a usable box.
+
+The labeled point on the curve marks the maximum volume. From the graph, the box volume is largest when x* is about 6.79 inches, giving a maximum volume of about 5,239.82 cubic inches. So the visualization tells us that to get the biggest possible box from a 36" by 48" sheet, we should cut out squares with side length roughly 6.8 inches.
+```{r}
+#| label: box-problem-function
+L <- 48; W <- 36
+V <- function(x) x * (L - 2*x) * (W - 2*x)
+x_max <- min(L, W) / 2
+
+# Maximize V(x) numerically
+opt <- optimize(V, interval = c(0, x_max), maximum = TRUE)
+x_star <- opt$maximum
+V_star <- opt$objective
+
+# Plot V(x) with the maximizer highlighted
+ggplot(data.frame(x = c(0, x_max)), aes(x = x)) +
+  stat_function(fun = V, linewidth = 1) +
+  geom_point(data = data.frame(x = x_star, y = V_star), aes(x = x, y = y), inherit.aes = FALSE, size = 2) +
+  annotate("text", x = x_star, y = V_star, vjust = -0.8,
+           label = paste0("x* = ", round(x_star, 2), ", V(x*) = ", round(V_star, 2))) +
+  expand_limits(y = V_star * 1.1) +
+  labs(
+    title = "Box Volume vs. Cut-out Side Length",
+    x = "Cut-out side length x (cm)",
+    y = "Volume V(x) = x(L - 2x)(W - 2x) (cm^3)"
+  ) +
+  theme_minimal() 
+```
+
+# Self Reflection
+
+So far in this course I feel that I have moved beyond just “doing calculations” and have started to think like someone who uses data to communicate. In the baby names project, I learned how to choose a small set of names, make a clear time–series plot with ggplot, and then explain what each line means in words. I realized that a good visualization must tell a story – for example, showing which names are rising, which are declining, and which are always rare – not just show numbers.
+
+The box problem helped me connect algebra, calculus, and graphs. By writing the volume as a function and plotting it, I could see why there is a single maximum and how the optimal cut size around 6.8 inches gives the largest volume. In the Armed Forces activity, I practiced building two–way tables and thinking about independence by comparing the distributions of ranks for males and females in a specific subgroup. These examples made abstract ideas like “optimization” and “independence” much more concrete.
+
+I also learned many technical skills that are important for real data work: using R, ggplot2, and janitor, organizing a Quarto document, fixing problems with chunk labels, wide tables, and figure placement. Altogether, this course has taught me that statistics is not only about formulas; it is about combining code, graphics, and clear writing to support my conclusions.
+
+# Code Appendix
+
+## A. Setup & Packages
+
+```{r}
+#| echo: true
+#| eval: false
+#| label: load packages
+
+
+# install.packages("tinytex")
+# below is the command for Pyhton if anyone wants to use instead of R. Run the command in terminal.
+# python -m pip install jupyter pandas numpy matplotlib
+
+# Load Packages ----
+library(googlesheets4) # For loading Armed Forces Data
+library(rvest) # For scraping Armed Forces Ranks
+#library(dcData) # For loading Baby Names Data
+library(babynames)  # For loading Baby Names Data
+library(tidyverse) # For data wrangling and visualizing
+library(janitor) # For making two-way table
+library(knitr) # For creating professional tables
+library(kableExtra) # For styling professional tables
+```
+
+## B. Armed Forces Data Wrangling & Frequency Table
+
+```{r}
+#| echo: true
+#| eval: false
+# ---- B. Armed Forces Wrangling & Table -----------------------------------
+# Tidy Armed Forces Data ---- ## Make two tied data frames for the June 2025 armed forces data ## 1 where case is a group of soliders and 1 where the case is ## an individual solider. Both need to have rank added. 
+# Step 1: Load Packages ---- 
+library(tidyverse) 
+library(rvest) 
+library(googlesheets4) 
+# Step 2: Scrape Rank Data ---- 
+webRanks <- read_html("https://neilhatfield.github.io/Stat184_PayGradeRanks.html") %>% html_elements(css = "table") %>% 
+html_table() 
+rawRanks <- webRanks[[1]] # Extract the data frame of ranks 
+# Step 3: Wrangle Rank Data ----
+## Enter a value in the first cell (1, 1)
+rawRanks[1, 1] <- "Type"
+## Extract actual column headers
+rankHeaders <- rawRanks[1, ]
+## Apply headers as column names
+names(rawRanks) <- rankHeaders[1,]
+## Remove redundant first row and last row
+rawRanks <- rawRanks[-c(1, 26), ]
+
+cleanRanks <- rawRanks %>%
+  dplyr::select(!Type) %>% # Remove extra column
+  pivot_longer(
+    cols = !`Pay Grade`, # The improper name requires backticks
+    names_to = "Branch",
+    values_to = "Rank"
+  ) %>%
+  mutate(
+    Rank = na_if(x = Rank, y = "--")
+  )
+# Step 4: Load Armed Forces Data ----
+gs4_deauth() # Prevents needing to sign into a Google account
+forcesHeaders <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
+  col_names = FALSE, # Turn off Column Names
+  n_max = 3 # read only the first three rows
+)
+
+rawForces <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
+  col_names = FALSE, # Turn off Column Names
+  skip = 3, # Skip the first three rows
+  n_max = 28, # Read only the next 28 rows; drops footer
+  na = c("N/A*") # Tells R to treat the N/A* as missing values
+)
+
+
+# Step 5: Wrangle Armed Forces Data ----
+## Step 5a: Create good column names ----
+### Pattern is Pay Grade followed by 3 columns for each branch in the order
+### Army, Navy, Marine Corp, Air Force, Space Force, and Total
+branchNames <- rep( # Create three copies of each branch
+  x = c("Army", "Navy", "Marine Corps", "Air Force", "Space Force", "Total"),
+  each = 3
+)
+tempHeaders <- paste( # Combine branch with other headers
+  c("", branchNames),
+  forcesHeaders[3,],
+  sep = "."
+)
+
+names(rawForces) <- tempHeaders
+
+## Step 5b: Wrangle Armed Forces Data ----
+cleanForces <- rawForces %>%
+  rename(Pay.Grade = `.Pay Grade`) %>%
+  dplyr::select(!contains("Total")) %>% # Remove total columns
+  filter( # Remove total rows; see note below
+    Pay.Grade != "Total Enlisted" & 
+   Pay.Grade != "Total Warrant Officers" & 
+   Pay.Grade != "Total Officers" & 
+   Pay.Grade != "Total"
+    ) %>% 
+  pivot_longer( # Reshape data
+    cols = !Pay.Grade,
+    names_to = "Branch.Sex",
+    values_to = "Frequency"
+  ) %>%
+  separate_wider_delim( # Separate branches and sex
+    cols = Branch.Sex,
+    delim = ".",
+    names = c("Branch", "Sex")
+  ) 
+
+# Step 6: Merge Data Frames ----
+key_forcesRanks <- left_join(
+  x = cleanForces,
+  y = cleanRanks,
+  by = join_by(Pay.Grade == `Pay Grade`, Branch == Branch)
+)
+
+# Step 7: Transform Group into Individual ----
+key_individualRanks <- key_forcesRanks %>%
+  filter(!is.na(Frequency)) %>% # Remove all cases with missing counts
+  uncount(
+    weights = Frequency
+  )
+```
+
+```{r}
+#| echo: true
+#| eval: false
+# Armed Forces Frequency Tables ----
+#Goal: Make two frequency tables showing rank and branch, by sex.
+
+# I am going to use the key_IndividualRanks data frame 
+# Load Packages ----
+library(tidyverse)
+library(janitor)
+library(knitr)
+library(kableExtra)
+
+# Filter Data on Sex ----
+maleSoldiers <- key_individualRanks %>%
+  filter(Sex == "Male")
+femaleSoldiers <- key_individualRanks %>%
+  filter(Sex == "Female")
+
+# Create Male Table ----
+## Base Table ----
+maleTable <- maleSoldiers %>%
+  tabyl(Rank, Branch) %>% # Original Branch, Rank; flipped for improvement
+  adorn_totals(where = c("row", "col")) %>%
+  adorn_percentages(denominator = "all") %>%
+  adorn_pct_formatting(digits = 2) 
+
+## Add Absolute Frequencies ----
+formatNs <- attr(maleTable, "core") %>%
+  adorn_totals(where = c("row", "col")) %>%
+  mutate(
+    across(where(is.numeric), .fns = ~format(.x, big.mark = ","))
+  )
+
+## Finalize Male Table ----
+maleTable <- maleTable %>%
+  adorn_ns(position = "front", ns = formatNs)
+
+# Create Female Table ----
+## Base Table ----
+femaleTable <- femaleSoldiers %>%
+  tabyl(Rank, Branch) %>%
+  adorn_totals(where = c("row", "col")) %>%
+  adorn_percentages(denominator = "all") %>%
+  adorn_pct_formatting(digits = 2) 
+
+## Add Absolute Frequencies ----
+formatNs <- attr(femaleTable, "core") %>%
+  adorn_totals(where = c("row", "col")) %>%
+  mutate(
+    across(where(is.numeric), .fns = ~format(.x, big.mark = ","))
+  )
+
+## Finalize Female Table ----
+femaleTable <- femaleTable %>%
+  adorn_ns(position = "front", ns = formatNs)
+
+# Polish Tables ----
+## Male Table ----
+maleTable %>%
+  kable(
+    caption = "Male Activity Duty Soldiers by Rank and Branch",
+    format   = "latex"
+  ) %>%
+  kable_styling(
+    latex_options = c("hold_position", "scale_down") 
+  )
+
+## Female Table ----
+femaleTable %>%
+  kable(
+    caption = "Female Activity Duty Soldiers by Rank and Branch",
+    format   = "latex"
+  ) %>%
+  kable_styling(
+    latex_options = c("hold_position", "scale_down") 
+  )
+```
+
+## C. Popularity of Baby Names (Activity #13)
+
+```{r}
+#| echo: true
+#| eval: false
+# ---- C. Baby Names Visualization -----------------------------------------
+# Load baby names
+bn <- NULL
+if (requireNamespace("dcData", quietly = TRUE)) {
+  data("BabyNames", package = "dcData", envir = environment())
+  bn <- get("BabyNames")
+} else {
+  stop("dcData package is required for BabyNames.")
+}
+
+# Standardize and verify columns
+names(bn) <- gsub("\\.+", "_", tolower(names(bn)))
+required <- c("name","year","count")
+if (!all(required %in% names(bn))) stop("dcData::BabyNames must contain columns: name, year, count")
+
+# Select names and aggregate
+instructors <- c("Aahil", "Aarin", "Charlise", "Eryana")
+subsetNames <- bn %>%
+  dplyr::filter(name %in% instructors) %>%
+  dplyr::group_by(name, year) %>%
+  dplyr::summarise(total = sum(count), .groups = "drop")
+
+# Build linetype mapping that honors special choices when present
+lt_all <- setNames(rep("solid", length(unique(subsetNames$name))), sort(unique(subsetNames$name)))
+lt_special <- c(
+  "Aahil"    = "solid",
+  "Aarin"    = "dashed",
+  "Charlise" = "longdash",
+  "Eryana"   = "dotdash"
+)
+overlap <- intersect(names(lt_special), names(lt_all))
+lt_all[overlap] <- lt_special[overlap]
+
+# ggplot with color + linetype legends merged
+ggplot(subsetNames, aes(x = year, y = total, color = name, linetype = name)) +
+  geom_line(linewidth = 0.9) +
+  scale_linetype_manual(values = lt_all) +
+  labs(
+    title = "Popularity of Selected Baby Names Over Time",
+    x = "Year",
+    y = "Total babies given name (US SSA)",
+    color = "Name",
+    linetype = "Name"
+  ) +
+  theme_minimal()
+```
+
+## D. Plotting the Box Volume Function (Activity #04)
+
+```{r}
+#| echo: true
+#| eval: false
+# ---- D. Box Problem: V(x) with stat_function -----------------------------
+L <- 48; W <- 36
+V <- function(x) x * (L - 2*x) * (W - 2*x)
+x_max <- min(L, W) / 2
+
+# Numeric maximization
+opt <- optimize(V, interval = c(0, x_max), maximum = TRUE)
+x_star <- opt$maximum
+V_star <- opt$objective
+
+# Plot
+ggplot(data.frame(x = c(0, x_max)), aes(x = x)) +
+  stat_function(fun = V, linewidth = 1) +
+  geom_point(data = data.frame(x = x_star, y = V_star), aes(x = x, y = y), inherit.aes = FALSE, size = 2) +
+  annotate("text", x = x_star, y = V_star, vjust = -0.8,
+           label = paste0("x* = ", round(x_star, 2), ", V(x*) = ", round(V_star, 2))) +
+  expand_limits(y = V_star * 1.1) +
+  labs(
+    title = "Box Volume vs. Cut-out Side Length",
+    x = "Cut-out side length x (cm)",
+    y = "Volume V(x) = x(L - 2x)(W - 2x) (cm^3)"
+  ) +
+  theme_minimal() 
+```

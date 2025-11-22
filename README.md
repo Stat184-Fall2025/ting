@@ -9,6 +9,7 @@ Semester: Fall 2025
 This repository contains my work for Activity #14 and Activity #15 (GitHub Practice).
 It demonstrates basic GitHub version control skills, including branches, issues,
 commits, and pull requests.
+This repository is part of STAT 184 at Penn State.
 
 ## Files
 

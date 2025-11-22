@@ -1,68 +1,86 @@
-# Plan for Repository & Activity #14
+# Plan Document for Repository & Activity #14
 
-## Repository (GitHub) Plan
-- Keep this repository public so that the instructor can see my work.
-- Use the **main** branch for stable, completed work.
-- Create additional branches (for example, `editing-activity14`) when I want to
-  experiment or make changes to the Activity #14 files.
-- Write clear commit messages that describe what changed and why.
-- Open pull requests to review and merge changes from a branch back into `main`.
-- Use Issues to record bugs, ideas, or to-do items related to Activity #14.
-- Make sure both the QMD file and the PDF for Activity #14 are stored in this
-  repository and kept up to date.
+This document describes my plans for both (1) the GitHub repository and  
+(2) the Activity #14 project. Each part is written in terms of Goals, Needs, and Steps.
 
-## Activity #14 Plan
+---
 
-1. **YAML header**
-   - Create a valid YAML header with:
-     - A meaningful title for the document.
-     - My name.
-     - The date.
-     - The output format (PDF).
-   - Check that the YAML renders correctly when knitting.
+## Part 1 – Plan for the GitHub Repository
 
-2. **Overall document structure**
-   - Organize the QMD into clear sections with appropriate headings.
-   - Make sure the headings match the required topics so the instructor can
-     quickly see where each part of the assignment is completed.
+### Goals
+- Keep a clear, public record of my work for Activities #14 and #15.
+- Practice basic version control skills: branches, commits, issues, and pull requests.
+- Maintain an organized repo so the instructor can easily find the QMD, PDF, README, and this plan.
 
-3. **Section: Armed Forces data wrangling revisit (Activities #08 and #10)**
-   - Re-use and clean up the data-wrangling code from Activity #08 (especially
-     the code from Question 5).
-   - Fix any problems so the code can run on another person’s computer without
-     modification.
-   - Use the processed data and the structure from Activity #10 to create a
-     frequency table for a *small subset* of soldiers.
-   - Explain briefly what the table shows.
+### Needs
+- A public GitHub repository that belongs to my STAT 184 account.
+- A `main` branch plus at least one additional branch (for example, `editing-activity14`).
+- A README file that explains the project and data.
+- This plan document (`PLAN.md`).
+- At least two Issues to track future work or improvements.
 
-4. **Section: Baby name popularity (Activity #13)**
-   - Revisit the ideas from Activity #13.
-   - Clearly explain why I chose the specific names that appear in my graphs or
-     tables (for example, personal reasons, interesting patterns, or trends).
-   - Include at least one summary or visualization of baby-name popularity.
+### Steps
+1. Create a public repository for Activity #14 on GitHub.
+2. Add the Activity #14 QMD file and PDF to the repo.
+3. Create and maintain a `README.md` file describing the project, data sources, plan, and structure.
+4. Create this `PLAN.md` file and keep it updated if the project changes.
+5. Create an additional branch (e.g., `editing-activity14`) for editing the README or QMD.
+6. Make changes on the new branch, commit with clear messages, and open a pull request.
+7. Merge the pull request into `main` after reviewing the changes.
+8. Create at least two Issues to记录 ideas, bugs, or improvements for the repo.
+9. Periodically check that all files are up to date and that the repo remains organized.
 
-5. **Section: Plotting a mathematical function (Activity #04 – box problem)**
-   - Reuse the function for the volume of the box from Activity #04.
-   - Create a plot of **box volume vs. cut-out side length**.
-   - Use **ggplot2** and `stat_function()` to produce the plot, as required.
-   - Label axes clearly and write a short interpretation of what the graph shows.
+---
 
-6. **Section: What I have learned so far**
-   - Reflect on what I believe I have learned and “mastered” so far in this
-     course.
-   - Write a short, honest paragraph (or more) summarizing my current
-     understanding and skills.
+## Part 2 – Plan for the Activity #14 Project
 
-7. **Code appendix**
-   - At the end of the QMD, create a section called **“Code Appendix”**.
-   - Move full code chunks into this appendix so that the main body focuses on
-     explanations, tables, and graphs.
-   - Keep the code well formatted and clearly separated into logical parts.
+### Goals
+- Produce a complete Activity #14 QMD that satisfies all assignment requirements.
+- Show that I can combine several earlier activities (08, 10, 13, 04) into one well-structured report.
+- Create a final PDF that is clear, reproducible, and ready to submit on Canvas.
 
-8. **Final checks and submission**
-   - Read through the whole document and fix grammar, spelling, and formatting
-     issues.
-   - Knit the QMD to create a PDF.
-   - Upload the PDF to Canvas in the correct submission area.
-   - Commit and push the final QMD and PDF to this GitHub repository with a
-     clear commit message.
+### Needs
+- A QMD file with a correct YAML header (title, name, date, output format).
+- Clean and working R code for:
+  - Armed forces data wrangling (from Activities #08 and #10).
+  - Baby-name popularity analysis (from Activity #13).
+  - The box-volume function and plot (from Activity #04).
+- A section where I reflect on what I have learned so far.
+- A “Code Appendix” section that contains full code chunks.
+- Enough time to review, knit to PDF, and fix any errors.
+
+### Steps
+1. **Set up the QMD**
+   - Create a YAML header with an appropriate title, my name, date, and PDF output.
+   - Add clear headings for each required section.
+
+2. **Armed forces data wrangling (Activities #08 and #10)**
+   - Bring in the data-wrangling code from Activity #08 (especially Question 5).
+   - Fix any problems so the code can run on another computer without changes.
+   - Use the structure from Activity #10 to build a frequency table for a small subset of soldiers.
+   - Briefly explain what the table shows.
+
+3. **Baby-name popularity (Activity #13)**
+   - Load the baby-name dataset used in class (from the R package provided in STAT 184).
+   - Create at least one summary or visualization of name popularity.
+   - Explain why I chose the specific names and what interesting patterns I see.
+
+4. **Box-volume function and plot (Activity #04)**
+   - Reuse the volume function from the “box problem”.
+   - Use `ggplot2` and `stat_function()` to plot volume vs. cut-out side length.
+   - Label the axes and write a short interpretation of the graph.
+
+5. **Reflection section**
+   - Write a short section that describes what I think I have learned or mastered so far in this course.
+   - Connect this reflection to the code and plots in the document where possible.
+
+6. **Code Appendix**
+   - Create a section named “Code Appendix”.
+   - Move full code chunks into this section so that the main body focuses on explanation and results.
+   - Keep the code well formatted and commented.
+
+7. **Final checks and submission**
+   - Read through the entire QMD to fix spelling, grammar, and formatting issues.
+   - Knit the QMD to produce a PDF.
+   - Upload the final PDF to Canvas.
+   - Commit and push the final QMD and PDF to this GitHub repository.
